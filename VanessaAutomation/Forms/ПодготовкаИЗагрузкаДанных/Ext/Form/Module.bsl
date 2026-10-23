@@ -796,7 +796,19 @@ Procedure IRefillObjectTabularSection(Val TabularSectionName, Val Values) Export
 	If Not Values.Count() Then
 		Return;
 	EndIf;
-	IRefillObjectTabularSectionAtServer(TabularSectionName, Values);
+	
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 28.01.2026                                                                                         
+	Files = FilesToUpload(Values);
+	
+	If Files.Count() > 0 Then
+	    Vanessa.ЗапретитьВыполнениеШагов();
+		AddParams = New Structure("Object, Name, Values, LoadTrue", "", TabularSectionName, Values, True);
+		Notify = New NotifyDescription("UploadBinaryDataContinuation", ThisForm, AddParams);
+		BeginPuttingFiles(Notify, Files, , False, ThisForm.UUID); 
+	Else
+		IRefillObjectTabularSectionAtServer(TabularSectionName, Values);
+	EndIf;	
+    //}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 
 EndProcedure
 
 &AtClient
@@ -1274,11 +1286,26 @@ EndProcedure
 
 &AtClient
 Procedure GenerateFeature(Command)
-	Feature.Очистить();
-	Feature.ДобавитьСтроку(GeneratedFeatureFile());
-	Items.GroupPages.CurrentPage = Items.GroupPageFeature;
 	
-	SaveBinData();
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 28.09.2025                                                                                        
+	Если РТ_ВыгрузитьВКаталог и ЗначениеЗаполнено(PathToUpload) Тогда 
+		РТ_СгенерироватьФичиВыгрузитьВКаталогНаСервере();
+		SaveBinData();
+	ИначеЕсли РТ_ВыгрузитьВКаталог и НЕ ЗначениеЗаполнено(PathToUpload) Тогда
+		Сообщение = Новый СообщениеПользователю;
+		Сообщение.Текст = "Заполните путь до каталога!";
+		Сообщение.Поле = "PathToUpload";
+		Сообщение.Сообщить();
+	Иначе
+	//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
+		Feature.Очистить();
+		Feature.ДобавитьСтроку(GeneratedFeatureFile());
+		Items.GroupPages.CurrentPage = Items.GroupPageFeature;
+		
+		SaveBinData();
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 28.09.2025
+	КонецЕсли;
+	//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 	
 EndProcedure
 
@@ -1293,15 +1320,41 @@ Procedure SaveBinData()
 	
 	Notify = New NotifyDescription("SaveBinaryDataContinuation", ThisForm);
 	List = New Array;
-	
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 02.10.2025
+	МассивТекстовыхФайлов = Новый Массив;
+	//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 	For Each elem In FilesToSave Do
-		
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 02.10.2025
+	Если Прав(elem.Presentation, 4) = ".txt" Тогда
+		МассивТекстовыхФайлов.Добавить(Новый ОписаниеПередаваемогоФайла(elem.Presentation, elem.Value));	
+	Иначе
 		List.Add(New TransferableFileDescription(elem.Presentation, elem.Value)); 
-		
+	КонецЕсли;
+	//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000	
 	EndDo;
 	
-	BeginGettingFiles(Notify, List, PathToUpload, False);
+	//BeginGettingFiles(Notify, List, PathToUpload, False);
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 02.10.2025
+	Если МассивТекстовыхФайлов.Количество() Тогда
+		Для Каждого эл из МассивТекстовыхФайлов Цикл
+			МассивФайлов = Новый Массив;
+			эл.Имя = СтрЗаменить(Эл.имя, "$workspaceRoot", Parameters.workspaceRoot);
+			МассивФайлов.Добавить(эл);
+		BeginGetFilesFromServer(Notify,МассивФайлов, эл.Имя);
+		//BeginGettingFiles(Notify, МассивФайлов, эл.Имя, False);
+		КонецЦикла;
+	КонецЕсли;
 	
+	Если List.Количество() Тогда
+		Для Каждого эл из List Цикл
+			МассивБинарников = Новый Массив;
+			эл.Имя = СтрЗаменить(Эл.имя, "$workspaceRoot", Parameters.workspaceRoot);
+			МассивБинарников.Добавить(эл);
+			BeginGetFilesFromServer(Notify,МассивБинарников,  эл.Имя);
+		//BeginGettingFiles(Notify, МассивБинарников, эл.Имя, False);
+		КонецЦикла;
+	КонецЕсли;
+	//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 EndProcedure
 
 &AtCLient
@@ -1312,12 +1365,26 @@ Procedure SaveBinaryDataContinuation(Files, AdditionalParameters) Export
 EndProcedure
 
 &AtClient
-Procedure GenerateFeatureForRefs(Command)		
+Procedure GenerateFeatureForRefs(Command)
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 28.09.2025
+	Если РТ_ВыгрузитьВКаталог и ЗначениеЗаполнено(PathToUpload) Тогда 
+		РТ_СгенерироватьФичиВыгрузитьВКаталогНаСервере(Истина);
+		SaveBinData();
+	ИначеЕсли РТ_ВыгрузитьВКаталог и НЕ ЗначениеЗаполнено(PathToUpload) Тогда
+		Сообщение = Новый СообщениеПользователю;
+		Сообщение.Текст = "Заполните путь до каталога!";
+		Сообщение.Поле = "PathToUpload";
+		Сообщение.Сообщить();
+    Иначе
+	//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 	Feature.Очистить();
 	Feature.ДобавитьСтроку(GenerateFeatureFileForRefsAtServer());
 	Items.GroupPages.CurrentPage = Items.GroupPageFeature;
 	
 	SaveBinData();
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 28.09.2025
+	КонецЕсли;
+	//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 	
 EndProcedure
 	
@@ -1592,7 +1659,17 @@ Function GetDatabaseObjectsValueTableWithoutTabularSection(Val MetadataObjectFul
 		Query.Text = Query.Text + "
 			|WHERE Object.Ref IN (&RefArray)";
 		Query.SetParameter("RefArray", RefArray);
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 22.12.2025
+	Else
+	   Query.Text = Query.Text + "
+			|WHERE NOT Object.ПометкаУдаления
+	   		|ORDER BY
+			|	Ссылка";
+	//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000                                                                                         
 	EndIf;
+    //{[+] РТИТС Биннатзаде Э.Ф. Изменение Времяночка 24.12.2025
+	//Query.Text = РТ_ТекстЗапросаДопРек();
+	//}РТИТС Биннатзаде Э.Ф. Изменение Времяночка
 	QueryExecute = Query.Execute();
 	If QueryExecute.IsEmpty() Then
 		QueryUnload = New ValueTable;		
@@ -1613,6 +1690,9 @@ EndFunction
 
 &AtServer
 Function GetDatabaseObjectsValueTablesOfTabularSection(Val MetadataObjectFullName, Val Refs = Undefined)
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 23.12.2025
+	ТабличныеЧасти = ПолучитьТабличныеЧасти(MetadataObjectFullName, Refs);
+	//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 	TabularSections = New Structure;
 	Query = New Query;
 	Query.Text = StrTemplate("SELECT ALLOWED *
@@ -1629,7 +1709,20 @@ Function GetDatabaseObjectsValueTablesOfTabularSection(Val MetadataObjectFullNam
 		Query.Text = Query.Text + "
 			|WHERE Object.Ref IN (&RefArray)";
 		Query.SetParameter("RefArray", RefArray);
+	Else
+		//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 23.12.2025                                                                                         
+		Query.Text = Query.Text + "
+			|WHERE NOT Object.ПометкаУдаления
+			|ORDER BY
+			|	Ссылка";
+		Для каждого ключзначение из ТабличныеЧасти Цикл
+			Query.Text = Query.Text+ "," + Символы.ПС + ключзначение.Ключ + ".НомерСтроки"; 
+		КонецЦикла;
+		//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 	EndIf;
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение Времяночка 24.12.2025
+	//Query.Text = РТ_ТекстЗапросаДопРек();
+	//}РТИТС Биннатзаде Э.Ф. Изменение Времяночка                                                                                         
 	QueryExecute = Query.Execute();
 	If QueryExecute.IsEmpty() Then
 		QueryUnload = New ValueTable;		
@@ -1656,6 +1749,64 @@ Function GetDatabaseObjectsValueTablesOfTabularSection(Val MetadataObjectFullNam
 	Return TabularSections;	
 EndFunction
 
+//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 23.12.2025
+&НаСервере
+Функция ПолучитьТабличныеЧасти(MetadataObjectFullName, Refs)
+	
+	TabularSections = New Structure;
+	Query = New Query;
+	Query.Text = StrTemplate("SELECT ALLOWED *
+									|FROM
+									|	%1 AS Object"
+								, MetadataObjectFullName);
+	If Refs <> Undefined Then
+		If TypeOf(Refs) <> Type("Array") Then
+			RefArray = New Array;
+			RefArray.Add(Refs);
+		Else
+			RefArray = Refs;
+		EndIf;
+		Query.Text = Query.Text + "
+			|WHERE Object.Ref IN (&RefArray)";
+		Query.SetParameter("RefArray", RefArray);
+	Else
+		//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 23.12.2025                                                                                         
+		Query.Text = Query.Text + "
+			|WHERE NOT Object.ПометкаУдаления
+			|ORDER BY
+			|	Ссылка";
+		//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
+	EndIf;
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение Времяночка 24.12.2025
+	//Query.Text = РТ_ТекстЗапросаДопРек();
+	//}РТИТС Биннатзаде Э.Ф. Изменение Времяночка                                                                                         
+	QueryExecute = Query.Execute();
+	If QueryExecute.IsEmpty() Then
+		QueryUnload = New ValueTable;		
+	Else
+		QueryUnload = QueryExecute.Unload();
+	EndIf;
+	For Each Column In QueryUnload.Columns Do
+		If Column.ValueType = New TypeDescription("ValueTable") Then
+			TabularSectionTable = QueryUnload[0][Column.Name].Copy();
+			DeleteUnsupportedValueTableColumn(TabularSectionTable);
+			TabularSectionTable.Clear();
+			For Each Row In QueryUnload Do
+				For Each SubRow In Row[Column.Name] Do
+					NewRow = TabularSectionTable.Add();
+					FillPropertyValues(NewRow, SubRow);
+				EndDo;
+			EndDo;
+			If TabularSectionTable.Count() Then
+				TabularSections.Insert(Column.Name, TabularSectionTable);
+			EndIf;
+		EndIf;
+	EndDo;
+	
+	Return TabularSections;		
+	
+КонецФункции
+//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 &AtServer
 Function GetDatabaseRegistersValueTable(Val MetadataObjectFullName, Val RecordKeys = Undefined)
 	Query = New Query;
@@ -2246,8 +2397,10 @@ Function ParseStringValue(Val ParsingValue, Val ValueType)
 			If elem.Presentation = Path Then
 				
 				TempPath = GetTempFileName();
-				GetFromTempStorage(FilesToSave[0].Value).Write(TempPath);
-				
+				//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 26.11.2025                                                                                         
+				//GetFromTempStorage(FilesToSave[0].Value).Write(TempPath);
+				GetFromTempStorage(elem.Value).Write(TempPath);
+				//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 				Reader = New XMLReader();
 				Reader.OpenFile(TempPath);
 				Result = ReadXML(Reader);
@@ -2260,6 +2413,33 @@ Function ParseStringValue(Val ParsingValue, Val ValueType)
 		EndDo;
 					
 	EndIf;
+	If Left(ParsingValue, 13) = "ValueTxtPath:" Then
+		
+		Path = StrReplace(ParsingValue, "ValueTxtPath:", "");
+		//Path = StrReplace(Path, РТ_ПутьДоКаталогаВыгрузкиСтрок, "");
+
+		Path = StrReplace(Path, "$workspaceRoot", Parameters.workspaceRoot);
+		
+		For Each elem In FilesToSave Do
+			
+			If elem.Presentation = Path Then
+				
+				TempPath = GetTempFileName();
+				GetFromTempStorage(elem.Value).Write(TempPath);
+				
+				Reader = New ЧтениеТекста();
+				Reader.Open(TempPath);
+				Result = Reader.Прочитать();
+				Reader.Close();
+		
+				Return Result;
+				
+			EndIf;
+				
+		EndDo;
+					
+	EndIf;
+
 	If Left(ParsingValue, 16) = "FindByAttribute:" Then
 		Return GetObjectLinkByAttributeString(ParsingValue);
 	EndIf;
@@ -2700,16 +2880,20 @@ Function GenerateFeatureFileForRefsAtServer()
 EndFunction
 
 &AtServer
-Function FeatureTitle(LangCode, ObjectsMode = False)
+Function FeatureTitle(LangCode, ObjectsMode = False, ВыгрузкаЗагрузкаДанных = Ложь)
 	TitleString = New Array;
 	TitleString.Add(LocalizedStringsServer()["s9a_" + LangCode]);
 	TitleString.Add(LocalizedStringsServer()["s9b_" + LangCode]);
 	TitleString.Add("");
 	TitleString.Add(LocalizedStringsServer()[?(ObjectsMode, "s9f_", "s9c_") + LangCode]);
 	TitleString.Add("");
-	TitleString.Add(LocalizedStringsServer()["s9d_" + LangCode]);
-	TitleString.Add(Chars.Tab + LocalizedStringsServer()["s9e_" + LangCode]);
-	TitleString.Add("");
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 05.02.2026
+	Если НЕ ВыгрузкаЗагрузкаДанных Тогда 
+		TitleString.Add(LocalizedStringsServer()["s9d_" + LangCode]);
+		TitleString.Add(Chars.Tab + LocalizedStringsServer()["s9e_" + LangCode]);
+		TitleString.Add("");
+	КонецЕсли;
+	//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 	Return StrConcat(TitleString, Chars.LF);
 EndFunction
 
@@ -2922,7 +3106,10 @@ Function GetMarkdownTables(Val MetadataObjectPropertyName, Val MetadataObjectNam
 	If Not IsRegister Then
 		TabularSections = GetDatabaseObjectsValueTablesOfTabularSection(MetadataObjectPropertyName + "." + MetadataObjectName, Objects);
 		For Each ItemData In TabularSections Do
-			TabularSectionMarkdownTable = GetMarkdownTable(MetadataObjectPropertyName, MetadataObjectName, ItemData.Value, RefReplaceMetadataObjects);
+		   //{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 28.01.2026                                                                                         	
+			//TabularSectionMarkdownTable = GetMarkdownTable(MetadataObjectPropertyName, MetadataObjectName, ItemData.Value, RefReplaceMetadataObjects);
+			TabularSectionMarkdownTable = GetMarkdownTable(MetadataObjectPropertyName, MetadataObjectName, ItemData.Value, RefReplaceMetadataObjects, ItemData.key);
+		   //}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000	
 			TabularSectionsDataMarkdownTables.Insert(ItemData.Key, TabularSectionMarkdownTable);
 		EndDo;
 	EndIf;
@@ -2931,7 +3118,7 @@ Function GetMarkdownTables(Val MetadataObjectPropertyName, Val MetadataObjectNam
 EndFunction
 
 &AtServer
-Function GetMarkdownTable(Val MetadataObjectPropertyName, Val MetadataObjectName, DataTable, RefReplaceMetadataObjects)
+Function GetMarkdownTable(Val MetadataObjectPropertyName, Val MetadataObjectName, DataTable, RefReplaceMetadataObjects, ИмяТаблицы = Неопределено)
 	ReturnValue = "";
 	MarkdownData = New Array;	 
 	
@@ -2958,6 +3145,11 @@ Function GetMarkdownTable(Val MetadataObjectPropertyName, Val MetadataObjectName
 	For Each Row In DataTable Do
 		Markdown = New Array;
 		Markdown.Add(Chars.Tab);
+		//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 28.01.2026                                                                                         
+		Если ИмяТаблицы <> Неопределено Тогда 
+			ИндексСтроки = DataTable.Индекс(Row);
+		КонецЕсли;
+        //}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 		For Each Column In DataTable.Columns Do
 			If isUnsupportedAttribute(Column.Name) Then
 				Continue;
@@ -2979,7 +3171,27 @@ Function GetMarkdownTable(Val MetadataObjectPropertyName, Val MetadataObjectName
                 TypeXML = StrReplace(TypeXML, EndTmpl, "");
                 RowData = GeValuetStringRepresentation(TypeXML, RefReplaceMetadataObjects);
 			Else
-				RowData = GeValuetStringRepresentation(Row[Column.Name], RefReplaceMetadataObjects);
+				//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 02.10.2025
+				DataValueTypeOf = TypeOf(Row[Column.Name]);
+				Если DataValueTypeOf = Тип("Строка") Тогда
+					Если  MetadataObjectPropertyName = "InformationRegister" Тогда
+						НаименованиеОбъекта = Неопределено;
+					Иначе
+						НаименованиеОбъекта = Строка(Row.Ссылка.УникальныйИдентификатор());
+					КонецЕсли;
+					
+					//RowData = GeValuetStringRepresentation(Row[Column.Name], RefReplaceMetadataObjects, Column.ТипЗначения.КвалификаторыСтроки.Длина, Row.Наименование, Column.Name, MetadataObjectPropertyName, MetadataObjectName);
+					RowData = GeValuetStringRepresentation(Row[Column.Name], RefReplaceMetadataObjects, Column.ТипЗначения.КвалификаторыСтроки.Длина, НаименованиеОбъекта, Column.Name, MetadataObjectPropertyName, MetadataObjectName, СтрДлина(Row[Column.Name]) > 150, ИмяТаблицы, ИндексСтроки);
+				Иначе 
+					Если  MetadataObjectPropertyName = "InformationRegister" Тогда
+						НаименованиеОбъекта = Неопределено;
+					Иначе
+						НаименованиеОбъекта = Строка(Row.Ссылка.УникальныйИдентификатор());
+					КонецЕсли;	
+					//RowData = GeValuetStringRepresentation(Row[Column.Name], RefReplaceMetadataObjects,,Row.Наименование,Column.Name, MetadataObjectPropertyName, MetadataObjectName);
+					RowData = GeValuetStringRepresentation(Row[Column.Name], RefReplaceMetadataObjects,,НаименованиеОбъекта, Column.Name, MetadataObjectPropertyName, MetadataObjectName, Ложь, ИмяТаблицы, ИндексСтроки);
+				КонецЕсли;
+				//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 			EndIf;
 			Markdown.Add(RowData);
 			If Not TypeOf(Row[Column.Name]) = Type("Number") Then
@@ -2998,8 +3210,35 @@ Function GetMarkdownTable(Val MetadataObjectPropertyName, Val MetadataObjectName
 	Return ReturnValue;
 EndFunction
 
+//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 04.10.2025
 &AtServer
-Function GeValuetStringRepresentation(DataValue, RefReplaceMetadataObjects)
+Функция РТ_ПолучитьТипМетаданных(MetadataObjectPropertyName)
+	
+	Если MetadataObjectPropertyName = "Catalog" Тогда
+		Возврат "Справочники";
+	ИначеЕсли MetadataObjectPropertyName = "Constant" Тогда
+		Возврат "Константы";
+	ИначеЕсли MetadataObjectPropertyName = "Document" Тогда
+		Возврат "Документы";
+	ИначеЕсли MetadataObjectPropertyName = "ChartOfAccount" Тогда
+		Возврат "ПланСчетов";
+	ИначеЕсли MetadataObjectPropertyName = "ChartsOfCharacteristicType" Тогда
+		Возврат "ПланВидовХарактеристик";
+	ИначеЕсли MetadataObjectPropertyName = "InformationRegister" Тогда
+		Возврат "РегистрСведений";
+	ИначеЕсли MetadataObjectPropertyName = "AccumulationRegister" Тогда
+		Возврат "РегистрНакопления";
+	ИначеЕсли MetadataObjectPropertyName = "BusinessProcess" Тогда
+		Возврат "БизнесПроцессы";
+	Иначе
+		Возврат MetadataObjectPropertyName;
+	КонецЕсли;
+	
+КонецФункции
+//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000                                                                                         
+
+&AtServer
+Function GeValuetStringRepresentation(DataValue, RefReplaceMetadataObjects, ДлинаСтроки = Неопределено, НаименованиеОбъекта = Неопределено, ИмяРеквизита = Неопределено, MetadataObjectPropertyName = Неопределено, MetadataObjectName = Неопределено, ЗаписыватьСтрокуВФайл = Ложь, ИмяТаблицы = Неопределено, ИндексСтроки = Неопределено)
 	ReturnValue = "";
 	DataValueTypeOf = TypeOf(DataValue);
 	MetadataObject = Metadata.FindByType(DataValueTypeOf);
@@ -3007,7 +3246,48 @@ Function GeValuetStringRepresentation(DataValue, RefReplaceMetadataObjects)
 		If DataValueTypeOf = Type("Boolean") Then
 			ReturnValue = Format(DataValue, "BF=False; BT=True;");
 		ElsIf DataValueTypeOf = Type("Number") Then
-			ReturnValue = Format(DataValue, "NDS=.; NGS=; NLZ=; NG=0");
+			ReturnValue = Format(DataValue, "NDS=.; NGS=; NLZ=; NG=0"); 
+		//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 02.10.2025
+		ИначеЕсли DataValueTypeOf = Тип("Строка") И ДлинаСтроки = 0 И НаименованиеОбъекта <> Неопределено И РТ_ВыгружатьСтрокиНеограниченнойДлинныВФайл И ЗаписыватьСтрокуВФайл Тогда
+				ТипМетаданных = РТ_ПолучитьТипМетаданных(MetadataObjectPropertyName);
+				Name = НаименованиеОбъекта + ?(ИмяТаблицы <> Неопределено и ИндексСтроки <> Неопределено ,"_" + ИмяТаблицы + "_" + ИндексСтроки, "") + "_" + ИмяРеквизита;
+				TempPath = GetTempFileName("txt"); 
+						
+				Writer = New ЗаписьТекста();
+				Writer.Открыть(TempPath);
+				Writer.Записать(DataValue);
+				//Writer.WriteXMLDeclaration();
+				//WriteXML(Writer, DataValue);
+				Writer.Close();
+				Reader = New ЧтениеТекста();
+				Reader.Open(TempPath);
+				Result = Reader.Прочитать();
+				Сообщить(result);
+				Reader.Close();
+
+				
+				TextData = New BinaryData(TempPath);
+				AddressTemp = PutToTempStorage(TextData);
+				DeleteFiles(TempPath);
+				
+				PathFeat = ParamsValueStorage.PathToFeature
+							+ ТипМетаданных
+							+ "\"
+							+ MetadataObjectName
+							+ "\"
+							+ "ext"
+							//+ "\"
+							//+ НаименованиеОбъекта
+							+ "\"
+							+ Name
+							+ ".txt";
+				
+				ReturnValue = "ValueTxtPath:" + PathFeat;
+				
+				//FilesToSave.Add(AddressTemp, Name + ".txt"); 
+				FilesToSave.Add(AddressTemp, PathFeat);
+
+		//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000                                                                                         
 		ElsIf DataValueTypeOf = Type("ValueStorage") Then
 			
 			If ParamsValueStorage.CreateFileForStorage Then
@@ -3038,13 +3318,27 @@ Function GeValuetStringRepresentation(DataValue, RefReplaceMetadataObjects)
 				AddressTemp = PutToTempStorage(BinData);
 				DeleteFiles(TempPath);
 				
+				//PathFeat = ParamsValueStorage.PathToFeature
+				//			+ Name      
+				//			+ ".bin";
+				ТипМетаданных = РТ_ПолучитьТипМетаданных(MetadataObjectPropertyName);
+				Name = НаименованиеОбъекта + ?(ИмяТаблицы <> Неопределено и ИндексСтроки <> Неопределено ,"_" + ИмяТаблицы + "_" + ИндексСтроки, "") + "_" + ИмяРеквизита;
 				PathFeat = ParamsValueStorage.PathToFeature
-							+ Name      
+							+ ТипМетаданных
+							+ "\"
+							+ MetadataObjectName
+							+ "\"
+							+ "ext"
+							//+ "\"
+							//+ НаименованиеОбъекта
+							+ "\"
+							+ Name
 							+ ".bin";
 				
 				ReturnValue = "ValueStoragePath:" + PathFeat;
 				
-				FilesToSave.Add(AddressTemp, Name + ".bin");
+				//FilesToSave.Add(AddressTemp, Name + ".bin");
+				FilesToSave.Add(AddressTemp, PathFeat);
 				
 			Else
 				
@@ -3274,9 +3568,12 @@ Function FilesToUpload(Values)
 		Row = Values[i];
 		For Each ParsingValue In Row Do
 			
-			If StrFind(ParsingValue.Value, "ValueStoragePath:") > 0 Then
-				
-				Path = StrReplace(ParsingValue.Value, "ValueStoragePath:", "");
+			If StrFind(ParsingValue.Value, "ValueStoragePath:") > 0 или StrFind(ParsingValue.Value, "ValueTxtPath:") > 0 Then
+				Если StrFind(ParsingValue.Value, "ValueStoragePath:") > 0 Тогда
+					Path = StrReplace(ParsingValue.Value, "ValueStoragePath:", "");
+				ИначеЕсли StrFind(ParsingValue.Value, "ValueTxtPath:") > 0 Тогда
+					Path = StrReplace(ParsingValue.Value, "ValueTxtPath:", "");
+				КонецЕсли;
 				Path = StrReplace(Path, "$workspaceRoot", Parameters.workspaceRoot);
 				
 				transfer = New TransferableFileDescription(Path);
@@ -3306,9 +3603,10 @@ Procedure UploadBinaryDataContinuation(Files, AdditionalParameters) Export
 	FilesToSave.Clear();
 	
 	For Each File In Files Do
-		
-		FilesToSave.Add(File.Location, File.Name);
-		
+		//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 26.11.2025                                                                                         
+		//FilesToSave.Add(File.Location, File.Name);
+		FilesToSave.Add(File.Location, File.ПолноеИмя);
+		//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000
 	EndDo;
 	
 	Vanessa.ПродолжитьВыполнениеШагов();
@@ -3341,6 +3639,10 @@ Procedure UploadBinaryDataContinuation(Files, AdditionalParameters) Export
 											, AdditionalParameters.Values
 											, AdditionalParameters.LoadTrue);
 
+	//{[+] РТИТС Биннатзаде Э.Ф. Изменение DEV-0000 03.02.2026
+	ElsIf AdditionalParameters.Object = "" Then
+		IRefillObjectTabularSectionAtServer(AdditionalParameters.Name, AdditionalParameters.Values);
+	//}РТИТС Биннатзаде Э.Ф. Изменение DEV-0000                                                                                         	
 	EndIf;	
 	
 EndProcedure
@@ -3746,7 +4048,9 @@ EndFunction
 Процедура CreateFileForStorageOnChange(Item)
 	
 	Items.PathToUpload.Enabled = CreateFileForStorage;
-	Items.MakeAbsPath.Enabled = CreateFileForStorage;
+	Items.MakeAbsPath.Enabled = CreateFileForStorage;  
+	
+	РТ_ВыгружатьСтрокиНеограниченнойДлинныВФайл = CreateFileForStorage;
 	
 КонецПроцедуры
 
@@ -3766,6 +4070,426 @@ EndFunction
 	Возврат Данные;
 	
 КонецФункции
+
+#КонецОбласти
+
+#Область ДоработкиCIS02
+
+&НаКлиенте
+Процедура РТ_СгенерироватьФичиВыгрузитьВКаталогНаСервереИзКоманднойстроки(Каталог, МассивМетаданных) Экспорт 
+	
+	OnOpen(Ложь);
+	РТ_УстановитьКаталогВыгрузкиФич(Каталог);
+	РТ_ОтобратьМетаданныеНаСервере(МассивМетаданных);
+	РТ_СгенерироватьФичиВыгрузитьВКаталогНаСервере();
+	SaveBinData();
+КонецПроцедуры 
+
+&НаСервере
+Процедура РТ_СгенерироватьФичиВыгрузитьВКаталогНаСервере(СОтбором = Ложь) Экспорт
+	Feature.Очистить();
+	Если СОтбором Тогда
+		Структурафич = РТ_GenerateFeatureFilesForRefsAtServer();	
+	Иначе
+		Структурафич = РТ_GeneratedFeatureFiles();
+	КонецЕсли;
+	Заголовок = Структурафич.Заголовок;
+	Массив = Новый Массив;
+	Для Каждого Элемент из Структурафич Цикл 
+		Если Элемент.Ключ = "Заголовок"	Тогда
+			Продолжить;
+		Иначе
+			Массив.Добавить(Заголовок);
+			Массив.Добавить(Элемент.Значение);
+			ТекстФичи = StrConcat(Массив, Chars.LF);
+			РТ_СохранитьВФайл(ТекстФичи, Элемент.Ключ);
+			Массив.Очистить();
+		КонецЕсли;
+	КонецЦикла;
+	
+КонецПроцедуры
+
+&НаКлиенте
+Процедура РТ_СгенерироватьФичиВыгрузитьВКаталог(Команда)
+	РТ_СгенерироватьФичиВыгрузитьВКаталогНаСервере();
+КонецПроцедуры
+
+&AtServer
+Function РТ_GeneratedFeatureFiles()
+	LangCode = ThisForm.StepsLanguage;
+	ReturnValue = New Array;	
+	Scenarious = New Array;
+	СтруктураСценариев = Новый Структура;
+	Заголовок = FeatureTitle(LangCode,,Истина);
+	СтруктураСценариев.Вставить("Заголовок", Заголовок);
+	MetadataListValue = FormAttributeToValue("MetadataList");
+	RefReplaceMetadataObjects = GetRefReplaceMetadataObjects(MetadataListValue, ThisForm.ReplaceRefByAttribute);
+	ParamsValueStorage = ParamsValueStorageSaveToFile();
+	FilesToSave.Clear();
+	
+	For Each MetadataListParentRow In MetadataListValue.Rows Do
+		For Each MetadataListRow In MetadataListParentRow.Rows Do
+			If Not MetadataListRow.Use Then
+				Continue;
+			EndIf;
+			
+			If MetadataListParentRow.Name = "Constants" Then
+				MarkdownConstantValue = GetMarkdownConstantValue(MetadataListRow.Name, RefReplaceMetadataObjects);
+				If Not ValueIsFilled(MarkdownConstantValue) Then
+					Continue;
+				EndIf;
+				Scenarious.Add(ScenarioConstant(MetadataListRow.Name, MarkdownConstantValue, LangCode));
+				СтруктураСценариев.Вставить("Константы_"+MetadataListRow.Name, ScenarioConstant(MetadataListRow.Name, MarkdownConstantValue, LangCode));
+				
+			Else
+				
+				MarkdownTables = GetMarkdownTables(MetadataTypeValueSingle(MetadataListParentRow.Name)
+					, MetadataListRow.Name
+					,
+					, RefReplaceMetadataObjects);
+				ContinueFlag = True;
+				If ValueIsFilled(MarkdownTables.ObjectDataMarkdownTable) Then
+					ContinueFlag = False;
+				EndIf;
+				If ContinueFlag And MarkdownTables.TabularSectionsDataMarkdownTables.Count() Then
+					For Each MarkdownTable In MarkdownTables.TabularSectionsDataMarkdownTables Do
+						If ValueIsFilled(MarkdownTable.Value) Then
+							ContinueFlag = False;
+							Break;
+						EndIf;
+					EndDo;
+				EndIf;
+				If ContinueFlag Then
+					Continue;
+				EndIf;
+				If MetadataListParentRow.Name = "Catalogs" Then
+					Scenarious.Add(ScenarioCatalog(MetadataListRow.Name, MarkdownTables, LangCode, ThisForm.UseDataExhangeLoadTrue));
+					СтруктураСценариев.Вставить("Справочники_"+MetadataListRow.Name, ScenarioCatalog(MetadataListRow.Name, MarkdownTables, LangCode, ThisForm.UseDataExhangeLoadTrue));
+				ElsIf MetadataListParentRow.Name = "Documents" Then
+					Scenarious.Add(ScenarioDocument(MetadataListRow.Name, MarkdownTables, LangCode, ThisForm.UseDataExhangeLoadTrue));
+					СтруктураСценариев.Вставить("Документы_"+MetadataListRow.Name, ScenarioDocument(MetadataListRow.Name, MarkdownTables, LangCode, ThisForm.UseDataExhangeLoadTrue));
+				ElsIf MetadataListParentRow.Name = "ChartsOfAccounts" Then
+					Scenarious.Add(ScenarioChartOfAccounts(MetadataListRow.Name, MarkdownTables, LangCode, ThisForm.UseDataExhangeLoadTrue));
+					СтруктураСценариев.Вставить("ПланыСчетов_"+MetadataListRow.Name, ScenarioChartOfAccounts(MetadataListRow.Name, MarkdownTables, LangCode, ThisForm.UseDataExhangeLoadTrue));
+				ElsIf MetadataListParentRow.Name = "ChartsOfCharacteristicTypes" Then
+					Scenarious.Add(ScenarioChartOfCharacteristicTypes(MetadataListRow.Name, MarkdownTables, LangCode, ThisForm.UseDataExhangeLoadTrue));
+					СтруктураСценариев.Вставить("ПланыВидовХарактеристик_"+MetadataListRow.Name, ScenarioChartOfCharacteristicTypes(MetadataListRow.Name, MarkdownTables, LangCode, ThisForm.UseDataExhangeLoadTrue));
+				ElsIf MetadataListParentRow.Name = "InformationRegisters" Then
+					Scenarious.Add(ScenarioInformationRegister(MetadataListRow.Name, MarkdownTables, LangCode));
+					СтруктураСценариев.Вставить("РегистрыСведений_"+MetadataListRow.Name, ScenarioInformationRegister(MetadataListRow.Name, MarkdownTables, LangCode));
+				ElsIf MetadataListParentRow.Name = "AccumulationRegisters" Then
+					Scenarious.Add(ScenarioAccumulationRegister(MetadataListRow.Name, MarkdownTables, LangCode));
+					СтруктураСценариев.Вставить("РегистрыНакопления_"+MetadataListRow.Name, ScenarioAccumulationRegister(MetadataListRow.Name, MarkdownTables, LangCode));
+				ElsIf MetadataListParentRow.Name = "BusinessProcesses" Then
+					СценарийБизнесПроцесса = ScenarioBusinessProcess(MetadataListRow.Name, MarkdownTables, LangCode, ThisForm.UseDataExhangeLoadTrue);
+					Scenarious.Add(СценарийБизнесПроцесса);
+					СтруктураСценариев.Вставить("БизнесПроцессы_" + MetadataListRow.Name, СценарийБизнесПроцесса);
+				Else
+					Scenarious.Add("");
+				EndIf;
+			EndIf;
+		EndDo;
+	EndDo;
+		
+	Return СтруктураСценариев;
+EndFunction
+
+Процедура РТ_СохранитьВФайл(Текст, Название)
+	
+	МассивСтрок = СтрРазделить(Название, "_", Ложь);
+	ТекстВФайл = Новый ТекстовыйДокумент;
+	ТекстВФайл.УстановитьТекст(Текст);
+	
+	Если МассивСтрок[1] = "РТ" Тогда
+		МассивСтрок.Вставить(1, МассивСтрок[1] + "_" +МассивСтрок[2]);
+	КонецЕсли;
+	
+	Каталог = PathToUpload +"\"+МассивСтрок[0]+"\"+МассивСтрок[1]+"\";
+	КаталогНаДиске = Новый Файл(Каталог);
+	Если НЕ  КаталогНаДиске.Существует() Тогда
+		
+		СоздатьКаталог(Каталог);
+	КонецЕсли;
+	ТекстВФайл.Записать(Каталог + МассивСтрок[1]+ ".feature");
+	
+КонецПроцедуры
+
+&НаКлиенте
+Процедура РТ_ПутьДоКаталогаФичНачалоВыбора(Элемент, ДанныеВыбора, ВыборДобавлением, СтандартнаяОбработка)
+	
+	СтандартнаяОбработка = False;
+	
+	NotifyDescription = New NotifyDescription("РТ_ВыборКаталогаВыгрузкиФичПродолжение", ThisForm);
+	Diaolg = Новый FileDialog(FileDialogMode.ChooseDirectory);
+	Diaolg.Show(NotifyDescription);
+
+КонецПроцедуры
+
+&AtClient
+Procedure РТ_ВыборКаталогаВыгрузкиФичПродолжение(Result, AdditionalParameters) Export
+	
+	If Result = Undefined 
+			OR Result.Count() = 0 Then
+		
+		Return;
+		
+	EndIf;
+	
+	//PathToUpload = StrReplace(Result[0], "//", "/");
+	РТ_ПутьДоКаталогаФич = Result[0];
+	
+EndProcedure
+
+&НаСервере
+Процедура РТ_ОтобратьМетаданныеНаСервере(МассивМетаданных) Экспорт
+	MetadataListValue = FormAttributeToValue("MetadataList");
+	РТ_СкорректироватьМетаданные(МассивМетаданных);	
+	Для  Каждого стрРодитель In MetadataListValue.Rows Цикл
+		Для Каждого строкаМетаданных In стрРодитель.Rows Цикл
+			Если  МассивМетаданных.Найти(строкаМетаданных.FullName) = Неопределено Тогда
+				Продолжить;
+			Иначе
+				строкаМетаданных.Use = Истина;
+			КонецЕсли;
+		КонецЦикла;
+	КонецЦикла;
+	ЗначениеВРеквизитФормы(MetadataListValue, "MetadataList");
+КонецПроцедуры
+
+&НаСервере
+Процедура РТ_СкорректироватьМетаданные(МассивМетаданных) Экспорт
+	cч = 0;	
+	Пока cч < МассивМетаданных.Количество() Цикл
+		эл = МассивМетаданных.Получить(cч);
+		Если СтрЧислоВхождений(эл,"Справочник") > 0 тогда
+			НовоеЗначение = СтрЗаменить(эл, "Справочник", "Catalog"); 
+			МассивМетаданных.Установить(cч, НовоеЗначение);
+		ИначеЕсли СтрЧислоВхождений(эл,"Документ") > 0 тогда
+			НовоеЗначение = СтрЗаменить(эл, "Документ", "Document");
+			МассивМетаданных.Установить(cч, НовоеЗначение);
+	    ИначеЕсли СтрЧислоВхождений(эл,"ПланыСчетов") > 0 тогда
+			НовоеЗначение = СтрЗаменить(эл, "ПланСчетов", "ChartOfAccount");
+			МассивМетаданных.Установить(cч, НовоеЗначение);
+        ИначеЕсли СтрЧислоВхождений(эл,"ПланВидовХарактеристик") > 0 тогда
+			НовоеЗначение = СтрЗаменить(эл, "ПланВидовХарактеристик", "ChartsOfCharacteristicType");
+			МассивМетаданных.Установить(cч, НовоеЗначение);
+        ИначеЕсли СтрЧислоВхождений(эл,"РегистрСведений") > 0 тогда
+			НовоеЗначение = СтрЗаменить(эл, "РегистрСведений", "InformationRegister");
+			МассивМетаданных.Установить(cч, НовоеЗначение);
+		ИначеЕсли СтрЧислоВхождений(эл,"РегистрыНакопления") > 0 тогда
+			НовоеЗначение = СтрЗаменить(эл, "РегистрНакопления", "AccumulationRegister");
+			МассивМетаданных.Установить(cч, НовоеЗначение);
+		ИначеЕсли СтрЧислоВхождений(эл,"Константы") > 0 тогда
+			НовоеЗначение = СтрЗаменить(эл, "Константа", "Constant");
+			МассивМетаданных.Установить(cч, НовоеЗначение);
+		КонецЕсли; 
+		
+		cч = cч+1;	
+	КонецЦикла;
+		
+КонецПроцедуры
+
+&НаСервере
+Процедура РТ_УстановитьКаталогВыгрузкиФич(Каталог) Экспорт
+	PathToUpload = Каталог;
+КонецПроцедуры
+
+&НаКлиенте
+Процедура РТ_ПутьДоКаталогаВыгрузкиСтрокНачалоВыбора(Элемент, ДанныеВыбора, ВыборДобавлением, СтандартнаяОбработка)
+	
+	СтандартнаяОбработка = False;
+	
+	NotifyDescription = New NotifyDescription("РТ_ВыборКаталогаВыгрузкиСтрокПродолжение", ThisForm);
+	Diaolg = Новый FileDialog(FileDialogMode.ChooseDirectory);
+	Diaolg.Show(NotifyDescription);
+
+	
+КонецПроцедуры 
+
+&AtClient
+Procedure РТ_ВыборКаталогаВыгрузкиСтрокПродолжение(Result, AdditionalParameters) Export
+	
+	If Result = Undefined 
+			OR Result.Count() = 0 Then
+		
+		Return;
+		
+	EndIf;
+	
+	//PathToUpload = StrReplace(Result[0], "//", "/");
+	РТ_ПутьДоКаталогаВыгрузкиСтрок = Result[0];
+	
+EndProcedure
+
+&AtServer
+Function РТ_GenerateFeatureFilesForRefsAtServer()	
+	LangCode = ThisForm.StepsLanguage;
+	ReturnValue = New Array;	
+	Scenarious = New Array;
+	AddComments = Not DontAddCommentsWithMetadataName;
+	
+	СтруктураСценариев = Новый Структура;
+	Заголовок = FeatureTitle(LangCode,,Истина);
+	СтруктураСценариев.Вставить("Заголовок", Заголовок);
+	
+	Objects = GetRefsWithDependencies();
+	ObjectsByTypes = GroupItemsByType(Objects);
+	MetadataListValue = FormAttributeToValue("MetadataList");
+	RefReplaceMetadataObjects = GetRefReplaceMetadataObjects(MetadataListValue, ThisForm.ReplaceRefByAttribute);
+	
+	ObjectsByTypesTable = New ValueTable;
+	ObjectsByTypesTable.Columns.Add("TypePriority");
+	ObjectsByTypesTable.Columns.Add("MetadataClass");
+	ObjectsByTypesTable.Columns.Add("MetadataObjectName");
+	ObjectsByTypesTable.Columns.Add("Objects");
+	
+	ParamsValueStorage = ParamsValueStorageSaveToFile();
+	FilesToSave.Clear();
+														
+	For Each KeyValuePair In ObjectsByTypes Do
+		ObjectsOfType = KeyValuePair.Value;
+		
+		MetadataFullName = ObjectsOfType[0].Metadata().FullName();
+		MetadataFullNameParts = StrSplit(MetadataFullName, ".");
+		MetadataClass = MetadataTypeValueEnFromRu(MetadataFullNameParts[0]);
+		MetadataObjectName = MetadataFullNameParts[1];
+		
+		If MetadataClass = "Catalog" Then
+			TypePriority = 1;
+		ElsIf MetadataClass = "ChartOfCharacteristicTypes" Then
+			TypePriority = 2;
+		ElsIf MetadataClass = "ChartOfAccounts" Then
+			TypePriority = 3;
+		ElsIf MetadataClass = "InformationRegister" Then
+			TypePriority = 4;
+		ElsIf MetadataClass = "AccumulationRegister" Then
+			TypePriority = 5;
+		ElsIf MetadataClass = "Document" Then
+			TypePriority = 6;
+		ElsIf MetadataClass = "BusinessProcess" Then
+			TypePriority = 7;
+		Else
+			Raise NStr("ru = 'Неподдерживаемый класс метаданных!'");
+		EndIf;
+		
+		NewRow = ObjectsByTypesTable.Add();
+		NewRow.TypePriority = TypePriority;
+		NewRow.MetadataClass = MetadataClass;
+		NewRow.MetadataObjectName = MetadataObjectName;
+		NewRow.Objects = ObjectsOfType;
+	EndDo;
+	ObjectsByTypesTable.Sort("TypePriority, MetadataObjectName");
+	
+	//Scenario = New Array;	
+	//Scenario.Add(LocalizedStringsServer()["s11a_" + LangCode]);
+	//Scenario.Add("");
+	
+	For Each TableRow In ObjectsByTypesTable Do
+		
+		Scenario = New Array;	
+		Scenario.Add(LocalizedStringsServer()["s11a_" + LangCode]);
+		Scenario.Add("");
+
+		MetadataClass = TableRow.MetadataClass;
+		MetadataObjectName = TableRow.MetadataObjectName;
+	
+		MarkdownTables = GetMarkdownTables(MetadataClass
+											, MetadataObjectName
+											, TableRow.Objects
+											, RefReplaceMetadataObjects);
+											
+		If IsBlankString(MarkdownTables.ObjectDataMarkdownTable) Then
+			Continue;
+		EndIf;
+
+		If MetadataClass = "Catalog" Then
+			ScenarioActionString = ScenarioCatalogActionString(LangCode, ThisForm.UseDataExhangeLoadTrue);
+		ElsIf MetadataClass = "Document" Then
+			ScenarioActionString = ScenarioDocumentActionString(LangCode, ThisForm.UseDataExhangeLoadTrue);
+		ElsIf MetadataClass = "ChartOfAccounts" Then
+			ScenarioActionString = ScenarioChartOfAccountsActionString(LangCode, ThisForm.UseDataExhangeLoadTrue);		
+		ElsIf MetadataClass = "ChartOfCharacteristicTypes" Then
+			ScenarioActionString = ScenarioChartOfCharacteristicTypesActionString(LangCode, ThisForm.UseDataExhangeLoadTrue);
+		ElsIf MetadataClass = "InformationRegister" Then
+			ScenarioActionString = ScenarioInformationRegisterActionString(LangCode);
+		ElsIf MetadataClass = "AccumulationRegister" Then
+			ScenarioActionString = ScenarioAccumulationRegisterActionString(LangCode);
+		ElsIf MetadataClass = "BusinessProcess" Then
+			ScenarioActionString = ScenarioBusinessProcessActionString(LangCode, ThisForm.UseDataExhangeLoadTrue);
+		EndIf;
+		
+		If AddComments Then
+			LocalizedMetadataClass = ?(LangCode = "ru", MetadataTypeValueRuFromEn(MetadataClass), MetadataClass);
+			Scenario.Add(Chars.Tab + "// " + LocalizedMetadataClass + "." + MetadataObjectName);
+			Scenario.Add("");
+		EndIf;	
+		Scenario.Add(Chars.Tab + StrTemplate(ScenarioActionString, """" + MetadataObjectName + """", Chars.LF, MarkdownTables.ObjectDataMarkdownTable));
+		For Each DataValue In MarkdownTables.TabularSectionsDataMarkdownTables Do
+			Scenario.Add("");
+			Scenario.Add(Chars.Tab + StrTemplate(ScenarioTabularSectionActionString(LangCode), """" + DataValue.Key + """", Chars.LF, DataValue.Value));
+		EndDo;
+		Scenario.Add("");
+		ТипКаталога = РТ_ПолучитьТипМетаданных(MetadataClass);
+		Если MetadataClass = "Catalog" Тогда
+			ТипКаталога = "Справочники";
+		КонецЕсли;
+		СтруктураСценариев.Вставить(ТипКаталога + "_" + TableRow.MetadataObjectName, StrConcat(Scenario, Chars.LF));
+		Scenario.Очистить();
+	EndDo;
+	
+	//Scenario = StrConcat(Scenario, Chars.LF);
+	//	
+	//ReturnValue.Add(FeatureTitle(LangCode, True));
+	//ReturnValue.Add(Scenario);
+	//
+	//Return StrConcat(ReturnValue, Chars.LF);
+	Return СтруктураСценариев;
+EndFunction
+
+&НаСервере
+Процедура ПриЗагрузкеДанныхИзНастроекНаСервере(Настройки)
+	РТ_ВыгружатьСтрокиНеограниченнойДлинныВФайл = Настройки["CreateFileForStorage"];
+КонецПроцедуры
+
+&НаКлиенте
+Процедура РТ_ВыгрузитьВКаталогПриИзменении(Элемент)
+	Элементы.GroupPageFeature.Видимость = НЕ РТ_ВыгрузитьВКаталог;
+КонецПроцедуры
+
+//{[+] РТИТС Биннатзаде Э.Ф. Изменение Времяночка 24.12.2025
+&НаСервере
+Функция РТ_ТекстЗапросаДопРек()
+	
+	Text =
+	"ВЫБРАТЬ РАЗЛИЧНЫЕ
+	|	ДополнительныеРеквизитыИСведенияЗависимостиДополнительныхРеквизитов.Ссылка КАК Ссылка
+	|ПОМЕСТИТЬ СТЧ
+	|ИЗ
+	|	ПланВидовХарактеристик.ДополнительныеРеквизитыИСведения.ЗависимостиДополнительныхРеквизитов КАК ДополнительныеРеквизитыИСведенияЗависимостиДополнительныхРеквизитов
+	|ГДЕ
+	|	НЕ ДополнительныеРеквизитыИСведенияЗависимостиДополнительныхРеквизитов.Ссылка.ПометкаУдаления
+	|;
+	|
+	|////////////////////////////////////////////////////////////////////////////////
+	|ВЫБРАТЬ
+	|	*
+	|ИЗ
+	|	ПланВидовХарактеристик.ДополнительныеРеквизитыИСведения КАК ДополнительныеРеквизитыИСведения
+	|ГДЕ
+	|	НЕ ДополнительныеРеквизитыИСведения.ПометкаУдаления
+	|	И (ПОДСТРОКА(ДополнительныеРеквизитыИСведения.РасположениеИмя, 0, 10) <> """"
+	|			ИЛИ ДополнительныеРеквизитыИСведения.РТ_АдресХранилищаНастройкиКомпановки <> """"
+	|			ИЛИ ДополнительныеРеквизитыИСведения.Ссылка В
+	|				(ВЫБРАТЬ
+	|					Т.Ссылка
+	|				ИЗ
+	|					СТЧ КАК Т))";
+	
+	
+	Возврат Text
+	
+КонецФункции
+//}РТИТС Биннатзаде Э.Ф. Изменение Времяночка
 
 #КонецОбласти
 
